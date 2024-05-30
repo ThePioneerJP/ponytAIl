@@ -1,13 +1,112 @@
-from dotenv import load_dotenv
 import sys
 import os
+from pathlib import Path
 import argparse
 import random
+import flute
 from flute.Modules.PromptProcessorFactory import PromptProcessorFactory
+import re
+
+def select_model(model):
+    if model == "random-fast":
+        fast_models = ["gpt-4o", "claude-3-haiku-20240307", "models/gemini-1.5-flash-latest"]
+        return random.choice(fast_models)
+    elif model == "random-accurate":
+        accurate_models = ["gpt-4-turbo", "claude-3-opus-20240229", "models/gemini-1.5-pro-latest"]
+        return random.choice(accurate_models)
+    else:
+        return model
+
+def create_node(folder, file_name, task, goal, node_definition, model, processor):
+    with open(os.path.join(folder, "node_creator.md"), "r", encoding="utf-8") as file:
+        system = file.read()
+        system = system.replace("[node_definition]", node_definition, 1)
+        system = system.replace("[file_name]", file_name, 1)
+        system = system.replace("[goal]", goal, 1)
+
+    selected_model = select_model(model)
+    factory = PromptProcessorFactory()
+    processor = factory.create_prompt_processor(selected_model)
+    response = processor.generate_response(task, temperature=1.0, top_p=1.0, max_tokens=4096, system=system).strip()
+    
+    if response.startswith('```'):
+        response = response[3:]
+    if response.endswith('```'):
+        response = response[:-3]
+
+    print(f"model: {selected_model}")
+    print(response)
+
+    with open(os.path.join(folder, file_name), "w", encoding="utf-8") as file:
+        file.write(response)
+
+def process_nodes(folder, nodes, task, goal, model, processor):
+    for node in nodes:
+        file_path = os.path.join(folder, node["file_name"])
+        with open(file_path, "r", encoding="utf-8") as file:
+            system = file.read()
+            system = system.replace("[goal]", goal, 1)
+
+        selected_model = select_model(model)
+        factory = PromptProcessorFactory()
+        processor = factory.create_prompt_processor(selected_model)
+        response = processor.generate_response(task, temperature=1.0, top_p=1.0, max_tokens=4096, system=system).strip()
+
+        if response.startswith('```'):
+            response = response[3:]
+        if response.endswith('```'):
+            response = response[:-3]
+
+        print(f"model: {selected_model}")
+        print(f"file: {node}")
+        print(response)
+
+        node["response"] = response
+
+def process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs):
+    if response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0].find("NONE") >= 0 and response.split("## CREATE_NODES")[1].find("NONE") >= 0:
+        return nodes, concluder_inputs
+
+    send_to_nodes = re.findall(r"- *\[?(.*?)\]? *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0], re.DOTALL)
+    create_nodes = re.findall(r"- *\[?(.*?)\]? *-d *\"(.*?)\" *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## CREATE_NODES")[1], re.DOTALL)
+
+    for node_info in create_nodes:
+        node_name = node_info[0]
+        node_definition = node_info[1]
+        task = node_info[2]
+        if not os.path.exists(os.path.join(folder, node_name)):
+            create_node(folder, node_name, task, goal, node_definition, model, processor)
+        nodes.append({"file_name": node_name, "response": ""})
+
+    if not send_to_nodes and not create_nodes:
+        return nodes, concluder_inputs
+
+    iteration += 1
+    print(f"iteration: {iteration}")
+
+    for node_info in send_to_nodes:
+        node_name = node_info[0]
+        task = node_info[1]
+        if node_name == "concluder.md":
+            concluder_inputs.append(task)
+        else:
+            if not os.path.exists(os.path.join(folder, node_name)):
+                node_definition = processor.generate_response(f"## Task\nDefine the role of the node given the node name \"{node_name}\" and the \"{goal}\". Only output the result.", temperature=1.0, top_p=1.0, max_tokens=4096).strip()
+                print(node_definition)
+                create_node(folder, node_name, task, goal, node_definition, model, processor)
+
+            nodes.append({"file_name": node_name, "response": ""})
+
+            process_nodes(folder, nodes, task, goal, model, processor)
+
+            for node in nodes:
+                nodes, concluder_inputs = process_response(node["response"], folder, goal, model, processor, iteration, nodes, concluder_inputs)
+
+    return nodes, concluder_inputs
 
 def main():
     parser = argparse.ArgumentParser(description="Ponytail command-line interface")
-    parser.add_argument("-f", "--file_path", required=True, help="Path to the input file")
+    parser.add_argument("-f", "--file_path", required=True, help="Path to the input folder")
     parser.add_argument("-g", "--goal", required=True, help="Goal or objective of the task")
     parser.add_argument("-m", "--model", default="random-fast", help="Name of the model to use")
     parser.add_argument("-r", "--result", default="", help="Additional result or output (optional)")
@@ -19,29 +118,79 @@ def main():
     model = args.model
     result = args.result
 
-    # モデルの選択
-    if model == "random-fast":
-        fast_models = ["gpt-4o", "claude-3-haiku-20240307", "models/gemini-1.5-flash-latest"]
-        selected_model = random.choice(fast_models)
-    elif model == "random-accurate":
-        accurate_models = ["gpt-4-turbo", "claude-3-opus-20240229", "models/gemini-1.5-pro-latest"]
-        selected_model = random.choice(accurate_models)
-    else:
-        selected_model = model
+    required_files = ["starter.md", "concluder.md", "node_creator.md"]
+    missing_files = []
+    folder = os.path.dirname(file_path)
+    for file in required_files:
+        if not os.path.exists(os.path.join(folder, file)):
+            missing_files.append(file)
 
-    # PromptProcessorFactoryクラスを使用してプロンプトプロセッサを作成
+    if missing_files:
+        print(f"Error: The following files are missing in the specified folder:")
+        for file in missing_files:
+            print(f"- {file}")
+        sys.exit(1)
+
+    iteration = 1
+
+    selected_model = select_model(model)
     factory = PromptProcessorFactory()
     processor = factory.create_prompt_processor(selected_model)
 
-    # ファイルからプロンプトを読み込む
-    with open(file_path, "r") as file:
-        prompt = file.read()
+    with open(file_path, "r", encoding="utf-8") as file:
+        system = file.read()
 
-    # プロンプトプロセッサを使用してプロンプトを処理
-    processed_prompt = processor.process_prompt(prompt, {"goal": goal, "result": result})
+    file_list = [file for file in Path(folder).glob("*.md") if file.name != os.path.basename(file_path)]
+    embedded_content = ""
+    for file_path in file_list:
+        with open(file_path, "r", encoding="utf-8") as file:
+            content = file.read()
+            sections = content.split("##")
+            for i, section in enumerate(sections):
+                if "Your Definition" in section:
+                    definition_section = section.split("##")[0].strip()
+                    next_section_index = i + 1
+                    if next_section_index < len(sections):
+                        definition_section = definition_section.replace("Your Definition", "").split(sections[next_section_index])[0].strip()
+                    embedded_content += f"### {file_path.name}\n{definition_section}\n"
+                    break
 
-    # 処理結果を表示
-    print(processed_prompt)
+    system = system.replace("[TO BE EMBEDDED]", embedded_content)
+    # デバッグ用
+    # print(system)
+
+    response = processor.generate_response(goal, temperature=1.0, top_p=1.0, max_tokens=4096, system=system).strip()
+
+    if response.startswith('```'):
+        response = response[3:]
+    if response.endswith('```'):
+        response = response[:-3]
+
+    print(f"iteration: {iteration}")
+    print(f"model: {selected_model}")
+    print(response)
+
+    nodes = []
+    concluder_inputs = []
+
+    nodes, concluder_inputs = process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs)
+
+    with open(os.path.join(folder, "concluder.md"), "r", encoding="utf-8") as file:
+        system = file.read()
+        system = system.replace("[goal]", goal, 1)
+
+    final_prompt = "\n".join(concluder_inputs + [node["response"] for node in nodes])
+    final_model = select_model(model)
+    final_response = processor.generate_response(temperature=1.0, top_p=1.0, max_tokens=4096, system=system, prompt=final_prompt).strip()
+
+    
+    if final_response.startswith('```'):
+        final_response = final_response[3:]
+    if final_response.endswith('```'):
+        final_response = final_response[:-3]
+
+    print(f"Final model: {final_model}")
+    print(f"Final response:\n{final_response}")
 
 if __name__ == "__main__":
     main()
