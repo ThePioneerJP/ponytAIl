@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='ponytail-agents',
     version='0.1.0',
-    description='A package for prompt processing and language model interaction',
+    description='ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligence with Language.',
     author='The Pioneer',
     url='https://github.com/thepioneerjp/ponytAIl',
     packages=find_packages(),
