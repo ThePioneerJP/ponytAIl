@@ -1,4 +1,5 @@
 # ponytAIl
+![image](https://github.com/ThePioneerJP/ponytAIl/assets/116901962/eb05d05a-0f5b-40a6-9907-81481b02dce7)
 
 > *Then God blessed them and said, “Be fruitful and multiply."* - Genesis 1:28
 
