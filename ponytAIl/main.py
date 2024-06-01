@@ -6,6 +6,7 @@ import random
 import flute
 from flute.Modules.PromptProcessorFactory import PromptProcessorFactory
 import re
+from datetime import datetime
 
 def select_model(model):
     if model == "random-fast":
@@ -17,7 +18,7 @@ def select_model(model):
     else:
         return model
 
-def create_node(folder, file_name, task, goal, node_definition, model, processor):
+def create_node(folder, file_name, task, goal, node_definition, model, processor, output_file):
     with open(os.path.join(folder, "node_creator.md"), "r", encoding="utf-8") as file:
         system = file.read()
         system = system.replace("[node_definition]", node_definition, 1)
@@ -39,8 +40,10 @@ def create_node(folder, file_name, task, goal, node_definition, model, processor
 
     with open(os.path.join(folder, file_name), "w", encoding="utf-8") as file:
         file.write(response)
+    with open(output_file, "a", encoding="utf-8") as file:
+        file.write(f"File : {file_name} has been created.\n---\n")  # 改行と区切り線を追加して、実行ごとに区切る
 
-def process_nodes(folder, nodes, task, goal, model, processor):
+def process_nodes(folder, nodes, task, goal, model, processor, output_file):
     for node in nodes:
         file_path = os.path.join(folder, node["file_name"])
         with open(file_path, "r", encoding="utf-8") as file:
@@ -62,8 +65,13 @@ def process_nodes(folder, nodes, task, goal, model, processor):
         print(response)
 
         node["response"] = response
+        file_name = node["file_name"] # バグ対策
+        # 結果をファイルに追記する
+        full_results = f"model: {selected_model}\nfile: {file_name}\n## RESPONSE\n{response}\n" # 結果を格納
+        with open(output_file, "a", encoding="utf-8") as file:
+            file.write(full_results + "\n---\n")  # 改行と区切り線を追加して、実行ごとに区切る
 
-def process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs):
+def process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file):
     if response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0].find("NONE") >= 0 and response.split("## CREATE_NODES")[1].find("NONE") >= 0:
         return nodes, concluder_inputs
 
@@ -75,7 +83,7 @@ def process_response(response, folder, goal, model, processor, iteration, nodes,
         node_definition = node_info[1]
         task = node_info[2]
         if not os.path.exists(os.path.join(folder, node_name)):
-            create_node(folder, node_name, task, goal, node_definition, model, processor)
+            create_node(folder, node_name, task, goal, node_definition, model, processor, output_file)
         nodes.append({"file_name": node_name, "response": ""})
 
     if not send_to_nodes and not create_nodes:
@@ -83,6 +91,8 @@ def process_response(response, folder, goal, model, processor, iteration, nodes,
 
     iteration += 1
     print(f"iteration: {iteration}")
+    with open(output_file, "a", encoding="utf-8") as file:
+        file.write(f"iteration: {iteration}\n")
 
     for node_info in send_to_nodes:
         node_name = node_info[0]
@@ -97,10 +107,10 @@ def process_response(response, folder, goal, model, processor, iteration, nodes,
 
             nodes.append({"file_name": node_name, "response": ""})
 
-            process_nodes(folder, nodes, task, goal, model, processor)
+    process_nodes(folder, nodes, task, goal, model, processor, output_file)
 
-            for node in nodes:
-                nodes, concluder_inputs = process_response(node["response"], folder, goal, model, processor, iteration, nodes, concluder_inputs)
+    for node in nodes:
+        nodes, concluder_inputs = process_response(node["response"], folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file)
 
     return nodes, concluder_inputs
 
@@ -132,6 +142,13 @@ def main():
         sys.exit(1)
 
     iteration = 1
+
+    # 現在の日時からタイムスタンプを生成
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    
+    # 結果を保存するファイルのパス
+    output_folder = os.path.dirname(folder)
+    output_file = os.path.join(output_folder, f"full_results_{timestamp}.md")
 
     selected_model = select_model(model)
     factory = PromptProcessorFactory()
@@ -170,10 +187,15 @@ def main():
     print(f"model: {selected_model}")
     print(response)
 
+    # 結果をファイルに追記する
+    full_results = f"iteration: {iteration}\nmodel: {selected_model}\nfile: {os.path.basename(file_path)}\n## RESPONSE\n{response}"
+    with open(output_file, "w", encoding="utf-8") as file:
+        file.write(full_results + "\n---\n")  # 改行と区切り線を追加して、実行ごとに区切る
+
     nodes = []
     concluder_inputs = []
 
-    nodes, concluder_inputs = process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs)
+    nodes, concluder_inputs = process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file)
 
     with open(os.path.join(folder, "concluder.md"), "r", encoding="utf-8") as file:
         system = file.read()
@@ -191,6 +213,9 @@ def main():
 
     print(f"Final model: {final_model}")
     print(f"Final response:\n{final_response}")
+    full_results = f"iteration: {iteration}\nmodel: {final_model}\nfile: concluder.md\n## RESPONSE\n{final_response}"
+    with open(output_file, "a", encoding="utf-8") as file:
+        file.write(full_results)
 
 if __name__ == "__main__":
     main()

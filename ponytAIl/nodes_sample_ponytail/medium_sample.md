@@ -39,6 +39,6 @@ You must always follow the output format below. You must only generate the resul
 {List up all the nodes to assign the tasks}
 
 ## CREATE_NODES
-- [suggested_name.md] -d "[node definition prompt, organized in a markdown manner]" -p "[task prompt, oganized in a markdown manner]" -g "[final goal]"
+- [suggested_name.md] -d "[node definition prompt, organized in a markdown manner]" -p "[task prompt, organized in a markdown manner]" -g "[final goal]"
 {List up all the necessary nodes}
 ```
