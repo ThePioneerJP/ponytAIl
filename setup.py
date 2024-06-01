@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='ponytail-agents',
-    version='0.1.1',
+    version='0.1.5',
     description='ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligence with Language.',
     author='The Pioneer',
     url='https://github.com/thepioneerjp/ponytAIl',
@@ -28,7 +28,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "ponytail=ponytail.main:main",
+            "ponytail=ponytAIl.main:main",
         ],
     },
 )

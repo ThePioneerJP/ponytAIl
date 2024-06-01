@@ -103,9 +103,12 @@ def process_response(response, folder, goal, model, processor, iteration, nodes,
             if not os.path.exists(os.path.join(folder, node_name)):
                 node_definition = processor.generate_response(f"## Task\nDefine the role of the node given the node name \"{node_name}\" and the \"{goal}\". Only output the result.", temperature=1.0, top_p=1.0, max_tokens=4096).strip()
                 print(node_definition)
-                create_node(folder, node_name, task, goal, node_definition, model, processor)
+                create_node(folder, node_name, task, goal, node_definition, model, processor, output_file)
 
             nodes.append({"file_name": node_name, "response": ""})
+
+    if all(node["file_name"] == "concluder.md" for node in nodes):
+        return nodes, concluder_inputs
 
     process_nodes(folder, nodes, task, goal, model, processor, output_file)
 

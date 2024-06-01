@@ -1,4 +1,7 @@
 # ponytAIl
+
+> *Then God blessed them and said, “Be fruitful and multiply."* - Genesis 1:28
+
 ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligence with Language. It is an node based multi-agent system targeting both LLM and BCI (in the future)
 
 ## Installation
