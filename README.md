@@ -1,5 +1,5 @@
 # ponytAIl
-ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligence with Language is an node based multi-agent system targeting both LLM and BCI (in the future)
+ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligence with Language. It is an node based multi-agent system targeting both LLM and BCI (in the future)
 
 ## Installation
 
@@ -21,11 +21,13 @@ The `ponytail-agents` command invokes the `main` function with the following com
 ### Example Commands
 
 ```bash
-ponytail-agents -f "YOUR_DIRECTORY\starter.md" -g "Define the number 1 using the mathematical collection"
-
-ponytail-agents -f "YOUR_DIRECTORY\starter.md" -g "Generate 5 candidate names for the self-reproducive LLM based multi-agent system. Note that the name must be abbreviated to 'PONYTAIL.'"
-
-ponytail-agents -f "YOUR_DIRECTORY\starter.md" -g "You are a villager. Send CREATE_NODES request by outlining other villagers, until you are satisfied with the diversity of the community. Use their names as the file names. Setup their profiles (ex. jobs, families, age, gender, etc) in a realistic and detailed manner. After, and ONLY after you are satisfied with the listed villagers, SEND_TO concluder.md to end the process."
+ponytail -f "YOUR_DIRECTORY\starter.md" -g "Define the number 1 using the mathematical collection"
+```
+```bash
+ponytail -f "YOUR_DIRECTORY\starter.md" -g "Generate 5 candidate names for the self-reproducive LLM based multi-agent system. Note that the name must be abbreviated to 'PONYTAIL.'"
+```
+```bash
+ponytail -f "YOUR_DIRECTORY\starter.md" -g "You are a villager. Send CREATE_NODES request by outlining other villagers, until you are satisfied with the diversity of the community. Use their names as the file names. Setup their profiles (ex. jobs, families, age, gender, etc) in a realistic and detailed manner. After, and ONLY after you are satisfied with the listed villagers, SEND_TO concluder.md to end the process."
 ```
 
 ### Prerequisites
