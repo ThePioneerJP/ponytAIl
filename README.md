@@ -7,11 +7,34 @@ ponytAIl: Polymorphic Orchestration of Networked Youthful, Adaptable Intelligenc
 
 ## Installation
 
-Install ponytAIl using pip:
+1. Install ponytAIl using pip:
 
 ```
 pip install ponytail-agents
 ```
+
+2. When you install ponytAIl, flute will also be installed simultaneously. You need to create a `.env` file in the root directory of flute and set the following API keys in it:
+
+```
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GOOGLE_API_KEY=
+```
+
+You must obtain these API keys from each service provider.
+
+3. The location of the flute package may vary depending on your environment setup. Here are some common ways to find it:
+
+- If you're using a virtual environment (venv, conda, etc.):
+  - Activate your virtual environment
+  - Run `python -c "import flute; print(flute.__file__)"`. The output will show the location of the flute package.
+
+- If you're using a global Python environment:
+  - Run `python -c "import flute; print(flute.__file__)"`. The output will show the location of the flute package.
+
+- If you're using an IDE or an editor (PyCharm, VS Code, etc.):
+  - Open your project in the IDE or an editor
+  - Look for the flute package in the project's virtual environment or the system's Python packages.
 
 ## Usage
 

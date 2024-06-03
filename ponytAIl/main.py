@@ -7,6 +7,8 @@ import flute
 from flute.Modules.PromptProcessorFactory import PromptProcessorFactory
 import re
 from datetime import datetime
+import concurrent.futures
+import time
 
 def select_model(model):
     if model == "random-fast":
@@ -70,39 +72,58 @@ def process_nodes(folder, nodes, task, goal, model, processor, output_file):
         full_results = f"model: {selected_model}\nfile: {file_name}\n## RESPONSE\n{response}\n" # 結果を格納
         with open(output_file, "a", encoding="utf-8") as file:
             file.write(full_results + "\n---\n")  # 改行と区切り線を追加して、実行ごとに区切る
+    return nodes
 
-def process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file):
-    if response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0].find("NONE") >= 0 and response.split("## CREATE_NODES")[1].find("NONE") >= 0:
+def process_response(responses, folder, goal, model, processor, iteration_base, concluder_inputs, output_file):
+    nodes = []
+    send_to_nodes = []
+    create_nodes = []
+    for response in responses:
+        if (len(response.split("## SEND_TO_NODES")) < 2 or len(response.split("## CREATE_NODES")) < 2) or ((response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0].find("NONE") >= 0) and response.split("## CREATE_NODES")[1].find("NONE") >= 0):
+            continue
+
+        send_to_nodes.extend(re.findall(r"- *\[?(.*?)\]? *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0], re.DOTALL))
+        create_nodes.extend(re.findall(r"- *\[?(.*?)\]? *-d *\"(.*?)\" *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## CREATE_NODES")[1], re.DOTALL))
+
+    if (not send_to_nodes or all(node_info[0] == "concluder.md" for node_info in send_to_nodes)) and (not create_nodes or all(node_info[0] == "concluder.md" for node_info in create_nodes)):
+
+        for node_info in send_to_nodes:
+            task = node_info[1]
+            concluder_inputs.append(task)
+        for node_info in create_nodes:
+            task = node_info[2]
+            concluder_inputs.append(task)
+
         return nodes, concluder_inputs
 
-    send_to_nodes = re.findall(r"- *\[?(.*?)\]? *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## SEND_TO_NODES")[1].split("## CREATE_NODES")[0], re.DOTALL)
-    create_nodes = re.findall(r"- *\[?(.*?)\]? *-d *\"(.*?)\" *-p *\"(.*?)\" *-g *\"(.*?)\"", response.split("## CREATE_NODES")[1], re.DOTALL)
-
     for node_info in create_nodes:
-        node_name = node_info[0]
+        node_name = node_info[0] if node_info[0].endswith(".md") else node_info[0] + ".md"
         node_definition = node_info[1]
         task = node_info[2]
         if not os.path.exists(os.path.join(folder, node_name)):
             create_node(folder, node_name, task, goal, node_definition, model, processor, output_file)
         nodes.append({"file_name": node_name, "response": ""})
 
-    if not send_to_nodes and not create_nodes:
-        return nodes, concluder_inputs
+    # iteration_base.split("-")の最後の要素をintにして、それに+1
+    iteration_parts = iteration_base.split("-")
+    iteration_num = int(iteration_parts[-1])
+    iteration_num += 1
 
-    iteration += 1
-    print(f"iteration: {iteration}")
+    iteration_base = "-".join(iteration_parts[:-1]) + "-" + str(iteration_num)
+    iteration_base = iteration_base[1:] if iteration_base.startswith("-") else iteration_base
+    print(f"iteration: {iteration_base}")
     with open(output_file, "a", encoding="utf-8") as file:
-        file.write(f"iteration: {iteration}\n")
+        file.write(f"iteration: {iteration_base}\n")
 
     for node_info in send_to_nodes:
-        node_name = node_info[0]
+        node_name = node_info[0] if node_info[0].endswith(".md") else node_info[0] + ".md"
         task = node_info[1]
         if node_name == "concluder.md":
             concluder_inputs.append(task)
         else:
             if not os.path.exists(os.path.join(folder, node_name)):
                 node_definition = processor.generate_response(f"## Task\nDefine the role of the node given the node name \"{node_name}\" and the \"{goal}\". Only output the result.", temperature=1.0, top_p=1.0, max_tokens=4096).strip()
-                print(node_definition)
+                print(f"node definition: {node_definition}")
                 create_node(folder, node_name, task, goal, node_definition, model, processor, output_file)
 
             nodes.append({"file_name": node_name, "response": ""})
@@ -112,8 +133,7 @@ def process_response(response, folder, goal, model, processor, iteration, nodes,
 
     process_nodes(folder, nodes, task, goal, model, processor, output_file)
 
-    for node in nodes:
-        nodes, concluder_inputs = process_response(node["response"], folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file)
+    nodes, concluder_inputs = process_response([node["response"] for node in nodes if "response" in node], folder, goal, model, processor, iteration_base, concluder_inputs, output_file)
 
     return nodes, concluder_inputs
 
@@ -198,7 +218,7 @@ def main():
     nodes = []
     concluder_inputs = []
 
-    nodes, concluder_inputs = process_response(response, folder, goal, model, processor, iteration, nodes, concluder_inputs, output_file)
+    nodes, concluder_inputs = process_response([response], folder, goal, model, processor, str(iteration), concluder_inputs, output_file)
 
     with open(os.path.join(folder, "concluder.md"), "r", encoding="utf-8") as file:
         system = file.read()
