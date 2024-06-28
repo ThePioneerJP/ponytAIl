@@ -15,7 +15,7 @@ def select_model(model):
         fast_models = ["gpt-4o", "claude-3-haiku-20240307", "models/gemini-1.5-flash-latest"]
         return random.choice(fast_models)
     elif model == "random-accurate":
-        accurate_models = ["gpt-4-turbo", "claude-3-opus-20240229", "models/gemini-1.5-pro-latest"]
+        accurate_models = ["gpt-4o", "claude-3-opus-20240229", "models/gemini-1.5-pro-latest"]
         return random.choice(accurate_models)
     else:
         return model
@@ -141,7 +141,7 @@ def main():
     parser = argparse.ArgumentParser(description="Ponytail command-line interface")
     parser.add_argument("-f", "--file_path", required=True, help="Path to the input folder")
     parser.add_argument("-g", "--goal", required=True, help="Goal or objective of the task")
-    parser.add_argument("-m", "--model", default="random-fast", help="Name of the model to use")
+    parser.add_argument("-m", "--model", default="claude-3-5-sonnet-20240620", help="Name of the model to use")
     parser.add_argument("-r", "--result", default="", help="Additional result or output (optional)")
 
     args = parser.parse_args()
